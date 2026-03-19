@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRISM</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Cinzel:wght@300;400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #000;
+    --white: #fff;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    cursor: default;
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  /* ── TITLE ── */
+  #title {
+    position: fixed;
+    top: 48px; left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Cinzel', serif;
+    font-weight: 300;
+    font-size: clamp(18px, 3vw, 32px);
+    letter-spacing: 0.7em;
+    color: rgba(255,255,255,0.12);
+    user-select: none;
+    transition: color 0.6s, text-shadow 0.6s;
+    z-index: 100;
+  }
+  #title:hover { color: rgba(255,255,255,0.3); cursor: pointer; }
+  #title.lit { color: rgba(255,255,255,0.55); text-shadow: 0 0 40px rgba(255,220,100,0.3); }
+
+  /* ── MAIN CANVAS AREA ── */
+  #scene {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #canvas-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* ── TORCH (modern flashlight, horizontal, pointing right) ── */
+  #torch-wrap {
+    position: fixed;
+    left: 4vw;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: row;   /* horizontal: handle → head → lens, pointing right */
+    align-items: center;
+    cursor: pointer;
+    z-index: 50;
+    user-select: none;
+    filter: drop-shadow(0 4px 18px rgba(0,0,0,0.7));
+  }
+
+  /* == HANDLE == */
+  .fl-handle {
+    position: relative;
+    width: 110px;
+    height: 28px;
+    border-radius: 4px 0 0 4px;
+    background: linear-gradient(180deg,
+      #4a4a4a 0%, #2e2e2e 18%, #1a1a1a 50%, #252525 82%, #3a3a3a 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      inset 0 -1px 0 rgba(0,0,0,0.5);
+  }
+  /* rubber grip knurling */
+  .fl-handle::before {
+    content:'';
+    position:absolute;
+    inset: 4px 8px;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0px, transparent 3px,
+      rgba(0,0,0,0.45) 3px, rgba(0,0,0,0.45) 5px
+    );
+    border-radius: 2px;
+  }
+  /* top highlight streak */
+  .fl-handle::after {
+    content:'';
+    position:absolute;
+    top:3px; left:10px; right:10px; height:2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    border-radius: 1px;
+  }
+
+  /* == BARREL / BODY == */
+  .fl-barrel {
+    position: relative;
+    width: 54px;
+    height: 34px;
+    background: linear-gradient(180deg,
+      #5a5a5a 0%, #3a3a3a 20%, #1c1c1c 50%, #2a2a2a 80%, #4a4a4a 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      inset 0 -1px 0 rgba(0,0,0,0.4);
+  }
+  /* anodized ring seam */
+  .fl-barrel::before {
+    content:'';
+    position:absolute;
+    top:0; bottom:0; left:6px; width:4px;
+    background: linear-gradient(180deg,
+      #666 0%, #333 40%, #555 100%
+    );
+  }
+  .fl-barrel::after {
+    content:'';
+    position:absolute;
+    top:0; bottom:0; right:6px; width:4px;
+    background: linear-gradient(180deg,
+      #666 0%, #333 40%, #555 100%
+    );
+  }
+
+  /* == HEAD (wider) == */
+  .fl-head {
+    position: relative;
+    width: 36px;
+    height: 46px;
+    background: linear-gradient(180deg,
+      #606060 0%, #383838 25%, #1e1e1e 50%, #2c2c2c 75%, #505050 100%
+    );
+    clip-path: polygon(0% 15%, 100% 0%, 100% 100%, 0% 85%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.1),
+      inset 0 -2px 0 rgba(0,0,0,0.5);
+  }
+  /* serrated bezel texture */
+  .fl-head::before {
+    content:'';
+    position:absolute;
+    top:0; bottom:0; right:0; width:10px;
+    background: linear-gradient(180deg,
+      #6a6a6a 0%, #2a2a2a 50%, #5a5a5a 100%
+    );
+  }
+
+  /* == LENS == */
+  .fl-lens {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%,
+      #4a5a7a 0%,
+      #2a3a6a 30%,
+      #0a1030 60%,
+      #050818 100%
+    );
+    border: 3px solid #3a3a3a;
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,0.8),
+      inset -2px -2px 4px rgba(255,255,255,0.05),
+      0 0 0 1px rgba(255,255,255,0.04);
+    overflow: hidden;
+    transition: box-shadow 0.4s;
+    flex-shrink: 0;
+  }
+  /* lens glass reflection */
+  .fl-lens::before {
+    content:'';
+    position:absolute;
+    top: 6px; left: 7px;
+    width: 14px; height: 8px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 50%;
+    transform: rotate(-30deg);
+  }
+  /* inner reflector ring */
+  .fl-lens::after {
+    content:'';
+    position:absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(80,100,160,0.3);
+    background: radial-gradient(circle, rgba(60,80,140,0.2) 0%, transparent 70%);
+  }
+
+  /* LED emitter dot */
+  .fl-led {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .fl-led::before {
+    content:'';
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #c0d8ff 0%, #6090e0 50%, #2040a0 100%);
+    opacity: 0.25;
+    transition: opacity 0.4s, box-shadow 0.4s;
+  }
+
+  /* ACTIVE state — LED glows */
+  #torch-wrap.active .fl-lens {
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,0.6),
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 0 20px 6px rgba(200,230,255,0.55),
+      0 0 50px 16px rgba(160,200,255,0.25);
+  }
+  #torch-wrap.active .fl-led::before {
+    opacity: 1;
+    box-shadow: 0 0 8px 4px rgba(200,230,255,0.9), 0 0 20px 8px rgba(160,200,255,0.5);
+  }
+  #torch-wrap.active .fl-lens::after {
+    background: radial-gradient(circle, rgba(200,230,255,0.35) 0%, rgba(100,160,255,0.1) 40%, transparent 70%);
+  }
+
+  /* power button on handle */
+  .fl-button {
+    position: absolute;
+    top: 50%; right: 14px;
+    transform: translateY(-50%);
+    width: 18px; height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #222 0%, #111 100%);
+    border: 1px solid #444;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  #torch-wrap.active .fl-button {
+    background: linear-gradient(180deg, #1a3a1a 0%, #0a200a 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.6), 0 0 6px rgba(0,200,0,0.4);
+    border-color: #2a5a2a;
+  }
+  .fl-button::after {
+    content:'';
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:6px; height:6px;
+    border-radius:50%;
+    background: #333;
+    border: 1px solid #555;
+    transition: background 0.3s;
+  }
+  #torch-wrap.active .fl-button::after {
+    background: #00cc44;
+    box-shadow: 0 0 4px #00cc44;
+  }
+
+  /* ── PRISM SVG ── */
+  #prism-wrap {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 260px;
+    height: 260px;
+    cursor: grab;
+    z-index: 40;
+    user-select: none;
+  }
+  #prism-wrap:active { cursor: grabbing; }
+
+  #prism-svg {
+    width: 100%; height: 100%;
+    overflow: visible;
+    transition: filter 0.4s;
+  }
+  #prism-wrap.lit #prism-svg {
+    filter: drop-shadow(0 0 18px rgba(180,180,255,0.35)) drop-shadow(0 0 40px rgba(140,140,255,0.15));
+  }
+
+  /* ── LIGHT BEAM ── */
+  #beam-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+  #beam-canvas.visible { opacity: 1; pointer-events: all; cursor: crosshair; }
+
+  /* ── RAINBOW SEGMENTS ── */
+  .rainbow-seg {
+    position: fixed;
+    cursor: pointer;
+    z-index: 35;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+  }
+  .rainbow-seg.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .rainbow-seg:hover { filter: brightness(1.3) saturate(1.4); }
+
+  /* ── SLIDE OVERLAY ── */
+  #slide-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s;
+    background: rgba(0,0,0,0.92);
+  }
+  #slide-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .slide-card {
+    position: relative;
+    width: min(600px, 90vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    padding: 60px 56px 56px;
+    background: rgba(8,8,12,0.95);
+    backdrop-filter: blur(20px);
+  }
+  .slide-card::before {
+    content:'';
+    position:absolute;
+    top:0; left:0; right:0;
+    height: 3px;
+    background: var(--slide-color, #fff);
+    border-radius: 2px 2px 0 0;
+    box-shadow: 0 0 30px var(--slide-color, #fff);
+  }
+
+  .slide-close {
+    position: absolute;
+    top: 20px; right: 24px;
+    width: 32px; height: 32px;
+    background: none;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 2px;
+    transition: all 0.2s;
+    line-height: 1;
+  }
+  .slide-close:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+
+  .slide-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--slide-color, #fff);
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+  .slide-title {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 300;
+    color: #fff;
+    margin-bottom: 28px;
+    line-height: 1.2;
+  }
+  .slide-body {
+    font-size: 16px;
+    line-height: 1.8;
+    color: rgba(255,255,255,0.6);
+    font-weight: 300;
+    font-style: italic;
+  }
+  .slide-body em {
+    font-style: normal;
+    color: rgba(255,255,255,0.85);
+  }
+
+
+
+  /* ── SECRET REVEAL ── */
+  #secret-symbol {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 200;
+    transition: opacity 0.8s;
+    color: rgba(255,255,255,0.05);
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.1em;
+  }
+  #secret-symbol.revealed {
+    opacity: 1;
+    pointer-events: all;
+    cursor: pointer;
+    color: rgba(255,220,120,0.7);
+    text-shadow: 0 0 40px rgba(255,200,80,0.5);
+  }
+</style>
+</head>
+<body>
+
+<div id="title">PRISM</div>
+
+<div id="scene">
+  <canvas id="canvas-bg"></canvas>
+</div>
+
+<canvas id="beam-canvas"></canvas>
+
+<!-- TORCH (modern flashlight, pointing right) -->
+<div id="torch-wrap" title="click to activate">
+  <div class="fl-handle">
+    <div class="fl-button"></div>
+  </div>
+  <div class="fl-barrel"></div>
+  <div class="fl-head"></div>
+  <div class="fl-lens">
+    <div class="fl-led"></div>
+  </div>
+</div>
+
+<!-- PRISM -->
+<div id="prism-wrap">
+  <svg id="prism-svg" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="prismFace" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#c8d8f8" stop-opacity="0.08"/>
+        <stop offset="30%" stop-color="#a0b8e8" stop-opacity="0.18"/>
+        <stop offset="60%" stop-color="#6080c0" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="#2040a0" stop-opacity="0.35"/>
+      </linearGradient>
+      <linearGradient id="prismLeft" x1="100%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#e8f0ff" stop-opacity="0.15"/>
+        <stop offset="40%" stop-color="#8090c0" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="#203060" stop-opacity="0.4"/>
+      </linearGradient>
+      <linearGradient id="prismRight" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#b0c8f8" stop-opacity="0.06"/>
+        <stop offset="50%" stop-color="#6080d0" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#102080" stop-opacity="0.45"/>
+      </linearGradient>
+      <linearGradient id="edgeGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+        <stop offset="50%" stop-color="#c0d0ff" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#8090e0" stop-opacity="0.2"/>
+      </linearGradient>
+      <linearGradient id="bottomEdge" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#6070c0" stop-opacity="0.4"/>
+        <stop offset="50%" stop-color="#b0c0f8" stop-opacity="0.7"/>
+        <stop offset="100%" stop-color="#4050a0" stop-opacity="0.3"/>
+      </linearGradient>
+      <filter id="prismBlur">
+        <feGaussianBlur stdDeviation="0.5"/>
+      </filter>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+        <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <radialGradient id="interiorGlow" cx="50%" cy="55%" r="40%">
+        <stop offset="0%" stop-color="#a0b8ff" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+      </radialGradient>
+      <!-- 3D bottom face -->
+      <linearGradient id="bottomFace" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#1a2860" stop-opacity="0.7"/>
+        <stop offset="50%" stop-color="#3050a0" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#0a1840" stop-opacity="0.8"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Shadow under prism -->
+    <ellipse cx="130" cy="222" rx="72" ry="8" fill="rgba(0,0,0,0.5)" filter="url(#prismBlur)"/>
+
+    <!-- === PRISM 3D === -->
+    <!-- Prism apex: 130,42 | base-left: 52,210 | base-right: 208,210 -->
+    <!-- 3D thickness: bottom face goes to y=220 -->
+
+    <!-- Bottom face (3D depth) -->
+    <polygon points="52,210 208,210 212,220 48,220"
+      fill="url(#bottomFace)"
+      stroke="rgba(80,100,200,0.3)" stroke-width="0.5"/>
+
+    <!-- Right face -->
+    <polygon points="208,210 212,220 132,52 130,42"
+      fill="url(#prismRight)"
+      stroke="rgba(100,120,240,0.2)" stroke-width="0.5"/>
+
+    <!-- Left face -->
+    <polygon points="52,210 48,220 128,52 130,42"
+      fill="url(#prismLeft)"
+      stroke="rgba(200,220,255,0.25)" stroke-width="0.5"/>
+
+    <!-- Main front face -->
+    <polygon points="130,42 52,210 208,210"
+      fill="url(#prismFace)"
+      stroke="none"/>
+
+    <!-- Interior volume glow -->
+    <polygon points="130,42 52,210 208,210"
+      fill="url(#interiorGlow)"/>
+
+    <!-- Highlight sheen across face -->
+    <polygon points="130,42 52,210 208,210"
+      fill="none"
+      stroke="url(#edgeGlow)"
+      stroke-width="0"/>
+
+    <!-- Left edge highlight (bright) -->
+    <line x1="130" y1="42" x2="52" y2="210"
+      stroke="url(#edgeGlow)" stroke-width="1.8"
+      filter="url(#glow)"/>
+
+    <!-- Right edge -->
+    <line x1="130" y1="42" x2="208" y2="210"
+      stroke="rgba(100,120,220,0.45)" stroke-width="1.2"/>
+
+    <!-- Bottom edge -->
+    <line x1="52" y1="210" x2="208" y2="210"
+      stroke="url(#bottomEdge)" stroke-width="1.5"/>
+
+    <!-- Apex sparkle -->
+    <circle cx="130" cy="42" r="2.5" fill="white" opacity="0.9" filter="url(#glow)"/>
+    <circle cx="130" cy="42" r="1" fill="white" opacity="1"/>
+
+    <!-- Face internal refraction lines -->
+    <line x1="130" y1="42" x2="100" y2="210" stroke="rgba(180,200,255,0.06)" stroke-width="1"/>
+    <line x1="130" y1="42" x2="160" y2="210" stroke="rgba(180,200,255,0.04)" stroke-width="1"/>
+
+    <!-- Surface glare streak -->
+    <polygon points="130,42 80,155 90,160"
+      fill="rgba(255,255,255,0.05)"/>
+
+    <!-- Bottom corner glints -->
+    <circle cx="52" cy="210" r="2" fill="rgba(100,140,255,0.5)" filter="url(#glow)"/>
+    <circle cx="208" cy="210" r="2" fill="rgba(80,100,220,0.4)" filter="url(#glow)"/>
+
+    <!-- Secret symbol inside prism (shown at right rotation) -->
+    <text id="prism-secret" x="130" y="148" text-anchor="middle"
+      font-family="Cinzel, serif" font-size="22" font-weight="300"
+      fill="rgba(200,220,255,0)" letter-spacing="2"
+      style="transition: fill 1s">✦</text>
+  </svg>
+</div>
+
+<!-- Hidden secret symbol outside prism -->
+<div id="secret-symbol">✦</div>
+
+<!-- Slide overlay -->
+<div id="slide-overlay">
+  <div class="slide-card" id="slide-card">
+    <button class="slide-close" id="slide-close">✕</button>
+    <div class="slide-label" id="slide-label"></div>
+    <div class="slide-title" id="slide-title"></div>
+    <div class="slide-body" id="slide-body"></div>
+  </div>
+</div>
+
+
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────
+const COLORS = [
+  { id:'red',    hex:'#FF2020', label:'WAVELENGTH I',   title:'Reading',      body:'I\'m drawn to books that make me think differently rather than just entertain me. I like stories that challenge assumptions, play with perspective, or reveal something deeper on a second read. Reading isn\'t just an escape for me—it\'s a way to understand how ideas are built and how emotions are shaped.' },
+  { id:'orange', hex:'#FF7000', label:'WAVELENGTH II',  title:'Photography',  body:'Photography is about noticing what others overlook. I\'m drawn to small moments—light falling in a certain way, expressions that last a second, scenes that feel ordinary until you frame them differently. A good photograph, for me, is something that feels honest without needing explanation.' },
+  { id:'yellow', hex:'#FFD700', label:'WAVELENGTH III', title:'Science',      body:'Science, to me, is curiosity turned into understanding. I like questioning how things work and then slowly uncovering the logic behind them. Whether it\'s a concept, a system, or a small observation, science gives me a way to look at the world with more precision and wonder at the same time.' },
+  { id:'green',  hex:'#00C840', label:'WAVELENGTH IV',  title:'Mathematics',  body:'What interests me most about mathematics is the clarity it offers. There\'s a certain satisfaction in breaking down a complex problem into something simple and logical. I enjoy patterns, structure, and the moment when everything suddenly makes sense after feeling impossible just seconds before.' },
+  { id:'blue',   hex:'#1890FF', label:'WAVELENGTH V',   title:'Writing',      body:'I\'m drawn to stories that hide something beneath the surface. I like building tension slowly, placing clues in plain sight, and letting the reader feel the shift before they understand it. Most of my ideas start as simple situations, then twist into something unexpected. I don\'t just write to tell stories—I write to make people notice things they would normally miss.' },
+  { id:'indigo', hex:'#4B0082', label:'WAVELENGTH VI',  title:'Filmmaking',   body:'Filmmaking is where everything comes together—story, sound, visuals, and emotion. I like creating moments that feel immersive, where the viewer isn\'t just watching but experiencing something. It\'s not about scale; it\'s about making each frame feel intentional and alive.' },
+  { id:'violet', hex:'#9400D3', label:'WAVELENGTH VII', title:'Music',        body:'Music is where I express what words alone can\'t hold. I\'m constantly exploring melodies that feel honest and lyrics that don\'t try too hard to impress. Some ideas come fully formed, others take time to evolve, but the goal stays the same—to create something that feels real the moment you hear it.' },
+];
+
+const HIDDEN_SLIDES = {
+  title: {
+    label: 'THE BEGINNING',
+    title: 'Before Light',
+    body: 'Press the light beam!'
+  },
+  prism: {
+    label: 'THE VESSEL',
+    title: 'The Prism Speaks',
+    body: 'Rotate the prism!'
+  },
+  beam: {
+    label: 'THE PATH',
+    title: 'The Journey of Light',
+    body: 'Press the prism!'
+  },
+  secret: {
+    label: 'THE HIDDEN',
+    title: 'You Found It',
+    body: 'Congrats, you\'ve found the secret slide!<br><br><a href="https://drive.google.com/file/d/1_uqDIqDEId-cwDcf3AFJeifyi7hfxnvy/view?usp=sharing" target="_blank" style="color:rgba(255,220,120,0.9);text-decoration:none;letter-spacing:0.05em;border-bottom:1px solid rgba(255,220,120,0.4);padding-bottom:2px;">Here\'s some piano playing for you</a>'
+  }
+};
+
+// ─── STATE ───────────────────────────────────────────────────────
+let torchOn = false;
+let prismAngle = 0;
+let isDragging = false;
+let dragStart = { x: 0, angle: 0 };
+let beamAnimFrame = null;
+let beamProgress = 0; // 0..1
+let targetProgress = 0;
+
+// ─── ELEMENTS ────────────────────────────────────────────────────
+const torchWrap = document.getElementById('torch-wrap');
+const prismWrap = document.getElementById('prism-wrap');
+const beamCanvas = document.getElementById('beam-canvas');
+const bctx = beamCanvas.getContext('2d');
+const titleEl = document.getElementById('title');
+const overlay = document.getElementById('slide-overlay');
+const slideClose = document.getElementById('slide-close');
+const slideLabelEl = document.getElementById('slide-label');
+const slideTitleEl = document.getElementById('slide-title');
+const slideBodyEl = document.getElementById('slide-body');
+const slideCard = document.getElementById('slide-card');
+const secretSymbol = document.getElementById('secret-symbol');
+const prismSecret = document.getElementById('prism-secret');
+
+
+// ─── CANVAS RESIZE ───────────────────────────────────────────────
+function resize() {
+  beamCanvas.width  = window.innerWidth  || 1;
+  beamCanvas.height = window.innerHeight || 1;
+  if (torchOn) drawBeam();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── PRISM GEOMETRY ──────────────────────────────────────────────
+function getPrismCenter() {
+  const rect = prismWrap.getBoundingClientRect();
+  return { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+}
+
+function getPrismApex() {
+  // apex is top of triangle, in prism SVG viewBox it's at (130, 42)
+  // SVG is 260×260, rendered at prismWrap size
+  const rect = prismWrap.getBoundingClientRect();
+  const scaleX = rect.width / 260;
+  const scaleY = rect.height / 260;
+  return {
+    x: rect.left + 130 * scaleX,
+    y: rect.top + 42 * scaleY
+  };
+}
+
+function getPrismLeftFace() {
+  // left edge entry point approx middle of left edge
+  const rect = prismWrap.getBoundingClientRect();
+  const scaleX = rect.width / 260;
+  const scaleY = rect.height / 260;
+  // midpoint of left edge: (130+52)/2=91, (42+210)/2=126
+  return {
+    x: rect.left + 91 * scaleX,
+    y: rect.top + 126 * scaleY
+  };
+}
+
+function getPrismRightFaceExit() {
+  const rect = prismWrap.getBoundingClientRect();
+  const scaleX = rect.width / 260;
+  const scaleY = rect.height / 260;
+  // mid of right edge: (130+208)/2=169, (42+210)/2=126
+  return {
+    x: rect.left + 169 * scaleX,
+    y: rect.top + 126 * scaleY
+  };
+}
+
+// Torch lens front (right edge of the flashlight)
+function getTorchTip() {
+  const lens = document.querySelector('.fl-lens');
+  if (!lens) { return { x: 0, y: 0 }; }
+  const rect = lens.getBoundingClientRect();
+  return {
+    x: rect.right,          // rightmost edge of lens = beam origin
+    y: rect.top + rect.height / 2
+  };
+}
+
+// ─── DRAW BEAM ───────────────────────────────────────────────────
+function drawBeam() {
+  try {
+    bctx.clearRect(0, 0, beamCanvas.width, beamCanvas.height);
+    if (!torchOn && beamProgress <= 0) return;
+
+    const p     = beamProgress;
+    const tip   = getTorchTip();
+    const entry = getPrismLeftFace();
+    const exit  = getPrismRightFaceExit();
+
+    // ── White beam: torch → prism ──
+    const beamEndX = tip.x + (entry.x - tip.x) * Math.min(p * 2, 1);
+    const beamEndY = tip.y + (entry.y - tip.y) * Math.min(p * 2, 1);
+
+    // Glow layer (no clip, safe for Safari)
+    bctx.save();
+    bctx.beginPath();
+    bctx.moveTo(tip.x, tip.y);
+    bctx.lineTo(beamEndX, beamEndY);
+    bctx.strokeStyle = 'rgba(255,240,200,0.35)';
+    bctx.lineWidth   = 14;
+    bctx.lineCap     = 'round';
+    bctx.stroke();
+    // Core
+    bctx.beginPath();
+    bctx.moveTo(tip.x, tip.y);
+    bctx.lineTo(beamEndX, beamEndY);
+    bctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    bctx.lineWidth   = 2.5;
+    bctx.stroke();
+    bctx.restore();
+
+    // ── Rainbow fan ──
+    if (p > 0.5) {
+      const rp = (p - 0.5) * 2;
+
+      const SPREAD_DEG     = 42;
+      const BASE_ANGLE_DEG = 38;
+      const exitAngleRad   = Math.atan2(exit.y - entry.y, exit.x - entry.x);
+      const baseRad        = exitAngleRad + BASE_ANGLE_DEG * Math.PI / 180;
+      const spreadRad      = SPREAD_DEG * Math.PI / 180;
+      const N              = COLORS.length;
+      const wedgeAngle     = spreadRad / N;
+
+      wedgeData = [];
+
+      const LEN     = Math.max(beamCanvas.width, beamCanvas.height) * 2.0;
+      const baseLen = LEN * rp;
+
+      // ── PASS 1: soft glow behind each band (NO clip, NO shadowBlur) ──
+      for (let i = N - 1; i >= 0; i--) {
+        const c     = COLORS[i];
+        const rgb   = hexToRgb(c.hex);
+        const isHov = (hoveredBand === i);
+        const curLen = baseLen * (isHov ? 1.15 : 1.0);
+        const a0    = baseRad - (i + 1) * wedgeAngle;
+        const a1    = baseRad - i * wedgeAngle;
+
+        bctx.save();
+        const glowAlpha = isHov ? 0.22 : 0.10;
+        // Wider wedge for glow halo
+        const glow = bctx.createRadialGradient(exit.x, exit.y, 0, exit.x, exit.y, curLen * 0.7);
+        glow.addColorStop(0,   `rgba(${rgb},${glowAlpha})`);
+        glow.addColorStop(0.5, `rgba(${rgb},${glowAlpha * 0.6})`);
+        glow.addColorStop(1,   `rgba(${rgb},0)`);
+        bctx.fillStyle = glow;
+        bctx.beginPath();
+        bctx.moveTo(exit.x, exit.y);
+        bctx.arc(exit.x, exit.y, curLen * 0.7, a0 - 0.04, a1 + 0.04);
+        bctx.closePath();
+        bctx.fill();
+        bctx.restore();
+      }
+
+      // ── PASS 2: solid colour fill (clip per wedge, NO shadowBlur) ──
+      for (let i = N - 1; i >= 0; i--) {
+        const c      = COLORS[i];
+        const rgb    = hexToRgb(c.hex);
+        const isHov  = (hoveredBand === i);
+        const OVL    = 0.003;
+        const a0     = baseRad - (i + 1) * wedgeAngle - (i < N-1 ? OVL : 0);
+        const a1     = baseRad - i * wedgeAngle        + (i > 0   ? OVL : 0);
+        const aMid   = (a0 + a1) / 2;
+        const curLen = baseLen * (isHov ? 1.15 : 1.0);
+
+        wedgeData.push({ i, a0, a1, aMid, curLen, color: c });
+
+        bctx.save();
+
+        // Clip to exact wedge — but NO shadowBlur inside (Safari bug)
+        bctx.beginPath();
+        bctx.moveTo(exit.x, exit.y);
+        bctx.arc(exit.x, exit.y, curLen + 2, a0, a1);
+        bctx.closePath();
+        bctx.clip();
+
+        // Solid fill — radial fade, no shadow
+        const alpha = isHov ? 1.0 : 0.90;
+        const fill  = bctx.createRadialGradient(exit.x, exit.y, 4, exit.x, exit.y, curLen);
+        fill.addColorStop(0.00, `rgba(${rgb},${alpha})`);
+        fill.addColorStop(0.08, `rgba(${rgb},${alpha})`);
+        fill.addColorStop(0.60, `rgba(${rgb},${alpha * 0.88})`);
+        fill.addColorStop(0.82, `rgba(${rgb},${alpha * 0.50})`);
+        fill.addColorStop(1.00, `rgba(${rgb},0.0)`);
+        bctx.fillStyle = fill;
+        bctx.beginPath();
+        bctx.moveTo(exit.x, exit.y);
+        bctx.arc(exit.x, exit.y, curLen, a0, a1);
+        bctx.closePath();
+        bctx.fill();
+
+        // Bright centre streak (no shadow)
+        const streakHalf = wedgeAngle * (isHov ? 0.30 : 0.20);
+        const streakLen  = curLen * (isHov ? 0.60 : 0.48);
+        const streak     = bctx.createRadialGradient(exit.x, exit.y, 0, exit.x, exit.y, streakLen);
+        streak.addColorStop(0.00, `rgba(255,255,255,${isHov ? 0.70 : 0.45})`);
+        streak.addColorStop(0.25, `rgba(255,255,255,${isHov ? 0.45 : 0.22})`);
+        streak.addColorStop(0.55, `rgba(${rgb},${isHov ? 0.50 : 0.28})`);
+        streak.addColorStop(1.00, `rgba(${rgb},0.0)`);
+        bctx.fillStyle = streak;
+        bctx.beginPath();
+        bctx.moveTo(exit.x, exit.y);
+        bctx.arc(exit.x, exit.y, streakLen, aMid - streakHalf, aMid + streakHalf);
+        bctx.closePath();
+        bctx.fill();
+
+        bctx.restore();
+      }
+    }
+  } catch(e) {
+    // Silently catch any canvas errors to prevent white screen
+    console.warn('drawBeam error:', e);
+  }
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+// ─── RAINBOW HIT TESTING (canvas-based) ──────────────────────────
+let rainbowDivs = []; // kept for API compatibility but unused
+let wedgeData = [];   // filled each drawBeam() call
+let hoveredBand = -1;
+
+function createRainbowDivs() {
+  // No DOM overlays needed — hit testing happens on canvas
+}
+
+function updateRainbowHitAreas() {
+  // no-op — wedgeData is populated in drawBeam
+}
+
+// Angle from exit point to mouse, then check which wedge it falls in
+beamCanvas.addEventListener('mousemove', e => {
+  if (!torchOn || wedgeData.length === 0) { hoveredBand = -1; return; }
+  const exit = getPrismRightFaceExit();
+  const mx = e.clientX, my = e.clientY;
+  const dx = mx - exit.x, dy = my - exit.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 10) { hoveredBand = -1; return; }
+  const angle = Math.atan2(dy, dx);
+
+  let found = -1;
+  for (const w of wedgeData) {
+    // normalize angles
+    let a0 = w.a0, a1 = w.a1;
+    let a = angle;
+    // bring into same range
+    while (a < a0 - Math.PI) a += 2 * Math.PI;
+    while (a > a1 + Math.PI) a -= 2 * Math.PI;
+    if (a >= a0 && a <= a1 && dist < w.curLen) {
+      found = w.i;
+      break;
+    }
+  }
+
+  if (found !== hoveredBand) {
+    hoveredBand = found;
+    beamCanvas.style.cursor = found >= 0 ? 'pointer' : 'crosshair';
+    drawBeam(); // redraw immediately on hover change
+  }
+});
+
+beamCanvas.addEventListener('mouseleave', () => {
+  if (hoveredBand !== -1) { hoveredBand = -1; drawBeam(); }
+  beamCanvas.style.cursor = 'crosshair';
+});
+
+// ─── ANIMATION LOOP ──────────────────────────────────────────────
+function animate() {
+  const step = 0.012;
+  if (targetProgress > beamProgress) {
+    beamProgress = Math.min(beamProgress + step, targetProgress);
+  } else if (targetProgress < beamProgress) {
+    beamProgress = Math.max(beamProgress - step * 1.5, targetProgress);
+  }
+
+  drawBeam();
+
+  if (Math.abs(beamProgress - targetProgress) > 0.001) {
+    beamAnimFrame = requestAnimationFrame(animate);
+  } else if (beamProgress <= 0.001) {
+    bctx.clearRect(0, 0, beamCanvas.width, beamCanvas.height);
+  }
+}
+
+function startBeam() {
+  targetProgress = 1;
+  beamCanvas.classList.add('visible');
+  cancelAnimationFrame(beamAnimFrame);
+  beamAnimFrame = requestAnimationFrame(animate);
+}
+
+function stopBeam() {
+  targetProgress = 0;
+  beamCanvas.classList.remove('visible');
+  rainbowDivs.forEach(d => { d.classList.remove('visible'); d.style.pointerEvents = 'none'; });
+  cancelAnimationFrame(beamAnimFrame);
+  beamAnimFrame = requestAnimationFrame(animate);
+}
+
+// ─── TORCH TOGGLE ────────────────────────────────────────────────
+function toggleTorch() {
+  torchOn = !torchOn;
+  torchWrap.classList.toggle('active', torchOn);
+  titleEl.classList.toggle('lit', torchOn);
+  prismWrap.classList.toggle('lit', torchOn);
+  if (torchOn) { startBeam(); } else { stopBeam(); }
+}
+torchWrap.addEventListener('click', toggleTorch);
+torchWrap.addEventListener('touchend', e => { e.preventDefault(); toggleTorch(); });
+
+// ─── PRISM DRAG ROTATION ─────────────────────────────────────────
+prismWrap.addEventListener('mousedown', e => {
+  if (e.target === secretSymbol) return;
+  isDragging = true;
+  dragStart = { x: e.clientX, angle: prismAngle };
+  e.preventDefault();
+});
+
+prismWrap.addEventListener('touchstart', e => {
+  if (e.target === secretSymbol) return;
+  isDragging = true;
+  dragStart = { x: e.touches[0].clientX, angle: prismAngle };
+  e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - dragStart.x;
+  prismAngle = dragStart.angle + dx * 0.5;
+  prismWrap.style.transform = `translate(-50%, -50%) rotate(${prismAngle}deg)`;
+
+  const norm = ((prismAngle % 360) + 360) % 360;
+  const nearSecret = (norm > 82 && norm < 98) || (norm > 262 && norm < 278);
+
+  if (nearSecret) {
+    prismSecret.setAttribute('fill', 'rgba(255,230,100,0.7)');
+    secretSymbol.classList.add('revealed');
+    secretSymbol.style.pointerEvents = 'all';
+  } else {
+    prismSecret.setAttribute('fill', 'rgba(200,220,255,0)');
+    secretSymbol.classList.remove('revealed');
+    secretSymbol.style.pointerEvents = 'none';
+  }
+
+  if (torchOn) drawBeam();
+});
+
+window.addEventListener('touchmove', e => {
+  if (!isDragging) return;
+  const dx = e.touches[0].clientX - dragStart.x;
+  prismAngle = dragStart.angle + dx * 0.5;
+  prismWrap.style.transform = `translate(-50%, -50%) rotate(${prismAngle}deg)`;
+
+  const norm = ((prismAngle % 360) + 360) % 360;
+  const nearSecret = (norm > 82 && norm < 98) || (norm > 262 && norm < 278);
+
+  if (nearSecret) {
+    prismSecret.setAttribute('fill', 'rgba(255,230,100,0.7)');
+    secretSymbol.classList.add('revealed');
+    secretSymbol.style.pointerEvents = 'all';
+  } else {
+    prismSecret.setAttribute('fill', 'rgba(200,220,255,0)');
+    secretSymbol.classList.remove('revealed');
+    secretSymbol.style.pointerEvents = 'none';
+  }
+
+  if (torchOn) drawBeam();
+  e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('mouseup', () => { isDragging = false; });
+window.addEventListener('touchend', () => { isDragging = false; });
+
+// ─── PRISM CLICK (hidden slide) ───────────────────────────────────
+prismWrap.addEventListener('click', e => {
+  if (Math.abs(e.clientX - (dragStart.x || e.clientX)) < 5) {
+    // only trigger if not dragging
+    openSlideData(HIDDEN_SLIDES.prism, '#a0b8ff');
+  }
+});
+
+// ─── TITLE CLICK ─────────────────────────────────────────────────
+titleEl.addEventListener('click', () => openSlideData(HIDDEN_SLIDES.title, '#ffffff'));
+
+// ─── SECRET SYMBOL CLICK ─────────────────────────────────────────
+secretSymbol.addEventListener('click', e => {
+  e.stopPropagation();
+  openSlideData(HIDDEN_SLIDES.secret, '#FFD700');
+});
+
+// ─── BEAM / RAINBOW CLICK ────────────────────────────────────────
+beamCanvas.addEventListener('click', e => {
+  if (!torchOn) return;
+
+  // 1. Check if clicking a rainbow colour band
+  if (wedgeData.length > 0) {
+    const exit = getPrismRightFaceExit();
+    const dx   = e.clientX - exit.x;
+    const dy   = e.clientY - exit.y;
+    const dist = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+
+    for (const w of wedgeData) {
+      let a0 = w.a0, a1 = w.a1, a = angle;
+      while (a < a0 - Math.PI) a += 2 * Math.PI;
+      while (a > a1 + Math.PI) a -= 2 * Math.PI;
+      if (a >= a0 && a <= a1 && dist > 8 && dist < w.curLen) {
+        openSlide(w.color);
+        return;
+      }
+    }
+  }
+
+  // 2. Fallback: click on the white beam → hidden slide
+  const tip   = getTorchTip();
+  const entry = getPrismLeftFace();
+  const d     = distToSegment(e.clientX, e.clientY, tip.x, tip.y, entry.x, entry.y);
+  if (d < 20) {
+    openSlideData(HIDDEN_SLIDES.beam, '#ffe080');
+  }
+});
+
+// Touch tap on beam canvas — same logic as click
+beamCanvas.addEventListener('touchend', e => {
+  if (!torchOn) return;
+  const touch = e.changedTouches[0];
+  if (wedgeData.length > 0) {
+    const exit = getPrismRightFaceExit();
+    const dx = touch.clientX - exit.x, dy = touch.clientY - exit.y;
+    const dist = Math.hypot(dx, dy), angle = Math.atan2(dy, dx);
+    for (const w of wedgeData) {
+      let a0 = w.a0, a1 = w.a1, a = angle;
+      while (a < a0 - Math.PI) a += 2 * Math.PI;
+      while (a > a1 + Math.PI) a -= 2 * Math.PI;
+      if (a >= a0 && a <= a1 && dist > 8 && dist < w.curLen) {
+        openSlide(w.color); return;
+      }
+    }
+  }
+  const tip = getTorchTip(), entry = getPrismLeftFace();
+  if (distToSegment(touch.clientX, touch.clientY, tip.x, tip.y, entry.x, entry.y) < 20) {
+    openSlideData(HIDDEN_SLIDES.beam, '#ffe080');
+  }
+});
+
+// Touch taps for title and prism hidden slides
+titleEl.addEventListener('touchend', e => { e.preventDefault(); openSlideData(HIDDEN_SLIDES.title, '#ffffff'); });
+prismWrap.addEventListener('touchend', e => {
+  if (e.target === secretSymbol) return;
+  // only open if barely moved (tap not drag)
+  if (Math.abs(e.changedTouches[0].clientX - dragStart.x) < 8) {
+    openSlideData(HIDDEN_SLIDES.prism, '#a0b8ff');
+  }
+});
+secretSymbol.addEventListener('touchend', e => { e.stopPropagation(); e.preventDefault(); openSlideData(HIDDEN_SLIDES.secret, '#FFD700'); });
+// Close overlay on touch outside card
+overlay.addEventListener('touchend', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+slideClose.addEventListener('touchend', e => { e.preventDefault(); overlay.classList.remove('open'); });
+
+function distToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)));
+  return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+}
+
+// ─── SLIDE SYSTEM ────────────────────────────────────────────────
+function openSlide(colorData) {
+  openSlideData(colorData, colorData.hex);
+}
+
+function openSlideData(data, color) {
+  slideCard.style.setProperty('--slide-color', color);
+  slideLabelEl.textContent = data.label;
+  slideTitleEl.textContent = data.title;
+  slideBodyEl.innerHTML = data.body;
+  overlay.classList.add('open');
+}
+
+slideClose.addEventListener('click', () => overlay.classList.remove('open'));
+overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.classList.remove('open'); });
+
+// ─── INIT ────────────────────────────────────────────────────────
+createRainbowDivs();
+
+// Hint removed
+
+// redraw on scroll/resize
+window.addEventListener('resize', () => { if(torchOn) drawBeam(); });
+</script>
+</body>
+</html>
